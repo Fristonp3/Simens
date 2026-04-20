@@ -1,4 +1,0 @@
-/home/fristonp/Simens/Project/build_doccheck/CMakeFiles/gd32f450_template.elf.dir
-/home/fristonp/Simens/Project/build_doccheck/CMakeFiles/flash.dir
-/home/fristonp/Simens/Project/build_doccheck/CMakeFiles/edit_cache.dir
-/home/fristonp/Simens/Project/build_doccheck/CMakeFiles/rebuild_cache.dir

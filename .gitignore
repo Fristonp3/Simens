@@ -1,0 +1,31 @@
+# CMake and Ninja build trees
+/build/
+/build-*/
+/build_*/
+/cmake-build-*/
+/out/
+/Debug/
+/Release/
+
+# In-source CMake/Ninja generated files
+/CMakeCache.txt
+/CMakeFiles/
+/cmake_install.cmake
+/build.ninja
+/.ninja_deps
+/.ninja_log
+/compile_commands.json
+
+# Root-level firmware build outputs
+/*.elf
+/*.hex
+/*.bin
+/*.map
+/*.obj
+/*.o
+/*.d
+
+# OS/editor metadata
+*:Zone.Identifier
+.DS_Store
+Thumbs.db
