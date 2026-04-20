@@ -1,0 +1,38 @@
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_SYSTEM_PROCESSOR arm)
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+
+# Prevent host (e.g. Conda x86) toolchain flags from leaking into ARM builds.
+set(ENV{CC} "")
+set(ENV{CXX} "")
+set(ENV{CFLAGS} "")
+set(ENV{CXXFLAGS} "")
+set(ENV{CPPFLAGS} "")
+set(ENV{LDFLAGS} "")
+
+set(CMAKE_C_FLAGS_INIT "" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS_INIT "" CACHE STRING "" FORCE)
+set(CMAKE_ASM_FLAGS_INIT "" CACHE STRING "" FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_INIT "" CACHE STRING "" FORCE)
+set(CMAKE_C_FLAGS "" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS "" CACHE STRING "" FORCE)
+set(CMAKE_ASM_FLAGS "" CACHE STRING "" FORCE)
+set(CMAKE_EXE_LINKER_FLAGS "" CACHE STRING "" FORCE)
+
+find_program(ARM_NONE_EABI_GCC arm-none-eabi-gcc)
+find_program(ARM_NONE_EABI_GXX arm-none-eabi-g++)
+find_program(ARM_NONE_EABI_ASM arm-none-eabi-gcc)
+find_program(ARM_NONE_EABI_OBJCOPY arm-none-eabi-objcopy)
+find_program(ARM_NONE_EABI_SIZE arm-none-eabi-size)
+
+if(NOT ARM_NONE_EABI_GCC)
+    message(FATAL_ERROR "arm-none-eabi-gcc not found in PATH")
+endif()
+
+set(CMAKE_C_COMPILER "${ARM_NONE_EABI_GCC}")
+set(CMAKE_CXX_COMPILER "${ARM_NONE_EABI_GXX}")
+set(CMAKE_ASM_COMPILER "${ARM_NONE_EABI_ASM}")
+set(CMAKE_OBJCOPY "${ARM_NONE_EABI_OBJCOPY}" CACHE INTERNAL "")
+set(CMAKE_SIZE "${ARM_NONE_EABI_SIZE}" CACHE INTERNAL "")
+
+set(CMAKE_EXECUTABLE_SUFFIX ".elf")
