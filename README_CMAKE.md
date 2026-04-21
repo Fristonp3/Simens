@@ -18,6 +18,21 @@ cd /home/fristonp/Simens/Template
 ./scripts/configure_build.sh /home/fristonp/Simens build
 ```
 
+## 一键编译与烧录
+
+当前仓库提供 `scripts/build_flash.sh`，默认执行 SDK 检查、CMake 配置、编译和 ST-Link 烧录，并将日志保存到 `logs/`：
+
+```bash
+cd /home/fristonp/Simens/Project
+bash scripts/build_flash.sh
+```
+
+仅编译：
+
+```bash
+bash scripts/build_flash.sh --build-only
+```
+
 ## 输出文件
 
 构建后在 `build/` 下生成：
