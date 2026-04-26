@@ -23,5 +23,5 @@ void bsp_power_enter_sleep(void)
 void bsp_power_enter_deepsleep(void)
 {
     /* Deep-sleep mode - woken by EXTI events from WAKE key (PA0) */
-    pmu_to_deepsleepmode(PMU_LDO_NORMAL, WFI_CMD);
+    pmu_to_deepsleepmode(PMU_LDO_NORMAL, PMU_LOWDRIVER_ENABLE, WFI_CMD);
 }
