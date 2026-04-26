@@ -3,5 +3,6 @@
 
 void bsp_power_init(void);
 void bsp_power_enter_sleep(void);
+void bsp_power_enter_deepsleep(void);
 
 #endif

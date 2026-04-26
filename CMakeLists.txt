@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(gd32f450_template C ASM)
+project(gd32f470_industrial_acq C ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -15,13 +15,12 @@ set(GD32_DEVICE_DIR "${GD32_CMSIS_DIR}/GD/GD32F4xx")
 set(GD32_SPL_DIR "${GD32_SDK_ROOT}/Firmware/GD32F4xx_standard_peripheral")
 set(GD32_UTIL_DIR "${GD32_SDK_ROOT}/Utilities")
 
-set(LINKER_SCRIPT "${GD32_DEVICE_DIR}/Source/GCC/Ld/gd32f450xI_flash.ld")
+set(LINKER_SCRIPT "${GD32_DEVICE_DIR}/Source/GCC/Ld/gd32f470xE_flash.ld")
 set(STARTUP_FILE "${GD32_DEVICE_DIR}/Source/GCC/startup_gd32f450_470.S")
 set(SYSTEM_FILE "${GD32_DEVICE_DIR}/Source/system_gd32f4xx.c")
-set(EVAL_FILE "${GD32_UTIL_DIR}/gd32f450i_eval.c")
 
 set(MISSING_FILES "")
-foreach(required_file IN LISTS LINKER_SCRIPT STARTUP_FILE SYSTEM_FILE EVAL_FILE)
+foreach(required_file IN LISTS LINKER_SCRIPT STARTUP_FILE SYSTEM_FILE)
     if(NOT EXISTS "${required_file}")
         list(APPEND MISSING_FILES "${required_file}")
     endif()
@@ -63,20 +62,20 @@ add_executable(${PROJECT_NAME}.elf
     main.c
     systick.c
     gd32f4xx_it.c
+    board.c
     ${APP_SOURCES}
     ${BSP_SOURCES}
     ${SERVICE_SOURCES}
     ${COMMON_SOURCES}
     ${BOOTLOADER_SOURCES}
     "${SYSTEM_FILE}"
-    "${EVAL_FILE}"
     "${STARTUP_FILE}"
     ${GD32_SPL_SOURCES}
 )
 
 target_compile_definitions(${PROJECT_NAME}.elf PRIVATE
     USE_STDPERIPH_DRIVER
-    GD32F450
+    GD32F470
 )
 
 target_include_directories(${PROJECT_NAME}.elf PRIVATE

@@ -132,6 +132,11 @@ void app_main_process(void)
 
     if(s_app.status.current_state == APP_STATE_BOOT) {
         bl_main_process();
+        if(bl_main_should_jump()) {
+            bl_main_do_jump();
+            /* Never returns */
+        }
+        return;
     }
 
     app_state_update_leds(&s_app, now_ms);
