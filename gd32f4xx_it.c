@@ -87,3 +87,9 @@ void USART0_IRQHandler(void)
 {
     bsp_uart_irq_handler();
 }
+
+/* USART2 interrupt handler (HC-06 Bluetooth) */
+void USART2_IRQHandler(void)
+{
+    bsp_uart_bt_irq_handler();
+}

@@ -23,5 +23,6 @@ void EXTI0_IRQHandler(void);
 void EXTI3_IRQHandler(void);
 void EXTI10_15_IRQHandler(void);
 void USART0_IRQHandler(void);
+void USART2_IRQHandler(void);
 
 #endif /* GD32F4XX_IT_H */

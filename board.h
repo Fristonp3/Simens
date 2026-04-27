@@ -113,6 +113,22 @@ uint8_t board_key_state_get(board_key_t key);
 
 void board_com_init(void);
 
+/* UART2 - HC-06 Bluetooth (PD5=TX, PD6=RX) */
+#define BOARD_UART_BT              USART2
+#define BOARD_UART_BT_CLK          RCU_USART2
+#define BOARD_UART_BT_TX_PORT      GPIOD
+#define BOARD_UART_BT_TX_CLK       RCU_GPIOD
+#define BOARD_UART_BT_TX_PIN       GPIO_PIN_5
+#define BOARD_UART_BT_TX_AF        GPIO_AF_7
+#define BOARD_UART_BT_RX_PORT      GPIOD
+#define BOARD_UART_BT_RX_CLK       RCU_GPIOD
+#define BOARD_UART_BT_RX_PIN       GPIO_PIN_6
+#define BOARD_UART_BT_RX_AF        GPIO_AF_7
+#define BOARD_UART_BT_IRQN         USART2_IRQn
+#define BOARD_UART_BT_BAUDRATE     115200U
+
+void board_com_bt_init(void);
+
 void board_i2c_oled_init(void);
 void board_i2c_oled_write(uint8_t dev_addr, const uint8_t *data, uint16_t length);
 

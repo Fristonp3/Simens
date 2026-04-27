@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "bl_flash.h"
-#include "bl_jump.h"
 #include "bsp/bsp_uart.h"
 #include "common/crc16.h"
 
@@ -38,68 +37,73 @@ typedef enum {
     BL_STATE_CRC_HIGH
 } bl_parser_state_t;
 
-static bl_parser_state_t s_state = BL_STATE_HEADER0;
-static uint8_t s_command;
-static uint8_t s_length;
-static uint8_t s_payload[BL_MAX_PAYLOAD];
-static uint8_t s_offset;
-static uint8_t s_crc_low;
-static uint32_t s_received_bytes;
+typedef struct {
+    bl_parser_state_t state;
+    uint8_t command;
+    uint8_t length;
+    uint8_t payload[BL_MAX_PAYLOAD];
+    uint8_t offset;
+    uint8_t crc_low;
+    uint32_t byte_count;
+    bool frame_ready;
+} bl_channel_parser_t;
+
+static bl_channel_parser_t s_parsers[2];
+static bl_channel_t s_locked_channel = BL_CHAN_NONE;
 static bool s_frame_ready;
 
-void bl_uart_reset(void)
+static void bl_parser_reset(bl_channel_parser_t *p)
 {
-    s_state = BL_STATE_HEADER0;
-    s_received_bytes = 0U;
-    s_frame_ready = false;
+    memset(p, 0, sizeof(*p));
+    p->state = BL_STATE_HEADER0;
 }
 
-void bl_uart_feed_byte(uint8_t byte)
+static bool bl_parser_feed(bl_channel_parser_t *p, uint8_t byte)
 {
-    s_received_bytes++;
+    p->byte_count++;
 
-    switch (s_state) {
+    switch (p->state) {
     case BL_STATE_HEADER0:
         if (byte == BL_HEADER0) {
-            s_state = BL_STATE_HEADER1;
+            p->state = BL_STATE_HEADER1;
         }
         break;
 
     case BL_STATE_HEADER1:
         if (byte == BL_HEADER1) {
-            s_state = BL_STATE_COMMAND;
+            p->state = BL_STATE_COMMAND;
         } else if (byte != BL_HEADER0) {
-            s_state = BL_STATE_HEADER0;
+            p->state = BL_STATE_HEADER0;
         }
         break;
 
     case BL_STATE_COMMAND:
-        s_command = byte;
-        s_state = BL_STATE_LENGTH;
+        p->command = byte;
+        p->state = BL_STATE_LENGTH;
         break;
 
     case BL_STATE_LENGTH:
-        s_length = byte;
-        s_offset = 0U;
-        if (s_length > BL_MAX_PAYLOAD) {
-            s_state = BL_STATE_HEADER0;
-        } else if (s_length == 0U) {
-            s_state = BL_STATE_CRC_LOW;
+        p->length = byte;
+        p->offset = 0U;
+        if (p->length > BL_MAX_PAYLOAD) {
+            p->state = BL_STATE_HEADER0;
+        } else if (p->length == 0U) {
+            p->state = BL_STATE_CRC_LOW;
         } else {
-            s_state = BL_STATE_PAYLOAD;
+            p->state = BL_STATE_PAYLOAD;
         }
         break;
 
     case BL_STATE_PAYLOAD:
-        s_payload[s_offset++] = byte;
-        if (s_offset >= s_length) {
-            s_state = BL_STATE_CRC_LOW;
+        p->payload[p->offset++] = byte;
+        if (p->offset >= p->length) {
+            p->state = BL_STATE_CRC_LOW;
         }
         break;
 
     case BL_STATE_CRC_LOW:
-        s_crc_low = byte;
-        s_state = BL_STATE_CRC_HIGH;
+        p->crc_low = byte;
+        p->state = BL_STATE_CRC_HIGH;
         break;
 
     case BL_STATE_CRC_HIGH:
@@ -107,34 +111,32 @@ void bl_uart_feed_byte(uint8_t byte)
         uint8_t crc_buf[2U + BL_MAX_PAYLOAD];
         uint16_t crc;
 
-        crc_buf[0] = s_command;
-        crc_buf[1] = s_length;
-        if (s_length > 0U) {
-            memcpy(&crc_buf[2], s_payload, s_length);
+        crc_buf[0] = p->command;
+        crc_buf[1] = p->length;
+        if (p->length > 0U) {
+            memcpy(&crc_buf[2], p->payload, p->length);
         }
-        crc = crc16_modbus(crc_buf, (size_t)(s_length + 2U));
+        crc = crc16_modbus(crc_buf, (size_t)(p->length + 2U));
 
-        if ((s_crc_low == (uint8_t)(crc & 0xFFU)) &&
+        p->state = BL_STATE_HEADER0;
+
+        if ((p->crc_low == (uint8_t)(crc & 0xFFU)) &&
             (byte == (uint8_t)((crc >> 8U) & 0xFFU))) {
-            s_frame_ready = true;
+            p->frame_ready = true;
+            return true;
         }
-
-        s_state = BL_STATE_HEADER0;
         break;
     }
 
     default:
-        s_state = BL_STATE_HEADER0;
+        p->state = BL_STATE_HEADER0;
         break;
     }
+
+    return false;
 }
 
-bool bl_uart_frame_complete(void)
-{
-    return s_frame_ready;
-}
-
-static void bl_send_response(uint8_t command, uint8_t result)
+static void bl_send_response(bl_channel_t chan, uint8_t command, uint8_t result)
 {
     uint8_t response[2 + 2 + 1 + 2];
     uint16_t crc;
@@ -150,57 +152,123 @@ static void bl_send_response(uint8_t command, uint8_t result)
     response[idx++] = (uint8_t)(crc & 0xFFU);
     response[idx++] = (uint8_t)((crc >> 8U) & 0xFFU);
 
-    bsp_uart_send_bytes(response, idx);
+    if (chan == BL_CHAN_BT) {
+        bsp_uart_bt_send_bytes(response, idx);
+    } else {
+        bsp_uart_send_bytes(response, idx);
+    }
+}
+
+static void bl_poll_channel(bl_channel_t chan)
+{
+    bool (*read_fn)(uint8_t *);
+    bl_channel_parser_t *parser;
+
+    if (s_locked_channel != BL_CHAN_NONE && s_locked_channel != chan) {
+        /* Drain bytes from non-locked channel */
+        uint8_t dummy;
+        if (chan == BL_CHAN_BT) {
+            while (bsp_uart_bt_read_byte(&dummy)) {}
+        } else {
+            while (bsp_uart_read_byte(&dummy)) {}
+        }
+        return;
+    }
+
+    read_fn = (chan == BL_CHAN_BT) ? bsp_uart_bt_read_byte : bsp_uart_read_byte;
+    parser = &s_parsers[chan];
+
+    uint8_t byte;
+    while (read_fn(&byte)) {
+        if (bl_parser_feed(parser, byte)) {
+            if (s_locked_channel == BL_CHAN_NONE) {
+                s_locked_channel = chan;
+            }
+            s_frame_ready = true;
+            return;
+        }
+    }
+}
+
+void bl_uart_reset(void)
+{
+    bl_parser_reset(&s_parsers[0]);
+    bl_parser_reset(&s_parsers[1]);
+    s_locked_channel = BL_CHAN_NONE;
+    s_frame_ready = false;
+}
+
+void bl_uart_poll(void)
+{
+    if (s_frame_ready) { return; }
+
+    bl_poll_channel(BL_CHAN_DEBUG);
+    if (!s_frame_ready) {
+        bl_poll_channel(BL_CHAN_BT);
+    }
+}
+
+bool bl_uart_frame_ready(void)
+{
+    return s_frame_ready;
 }
 
 void bl_uart_process_frame(void)
 {
-    s_frame_ready = false;
+    bl_channel_parser_t *parser = &s_parsers[s_locked_channel];
 
-    switch (s_command) {
+    s_frame_ready = false;
+    parser->frame_ready = false;
+
+    switch (parser->command) {
     case BL_CMD_ERASE:
         bl_flash_erase_app();
-        bl_send_response(BL_CMD_ERASE, 0x00U);
+        bl_send_response(s_locked_channel, BL_CMD_ERASE, 0x00U);
         break;
 
     case BL_CMD_WRITE:
-        if (s_length >= 4U) {
-            uint32_t addr = ((uint32_t)s_payload[0] << 24U) |
-                            ((uint32_t)s_payload[1] << 16U) |
-                            ((uint32_t)s_payload[2] << 8U) |
-                            ((uint32_t)s_payload[3]);
-            uint8_t data_len = (uint8_t)(s_length - 4U);
-            if (bl_flash_write_chunk(addr, &s_payload[4], data_len)) {
-                bl_send_response(BL_CMD_WRITE, 0x00U);
+        if (parser->length >= 4U) {
+            uint32_t addr = ((uint32_t)parser->payload[0] << 24U) |
+                            ((uint32_t)parser->payload[1] << 16U) |
+                            ((uint32_t)parser->payload[2] << 8U) |
+                            ((uint32_t)parser->payload[3]);
+            uint8_t data_len = (uint8_t)(parser->length - 4U);
+            if (bl_flash_write_chunk(addr, &parser->payload[4], data_len)) {
+                bl_send_response(s_locked_channel, BL_CMD_WRITE, 0x00U);
             } else {
-                bl_send_response(BL_CMD_WRITE, 0x01U);
+                bl_send_response(s_locked_channel, BL_CMD_WRITE, 0x01U);
             }
         } else {
-            bl_send_response(BL_CMD_WRITE, 0x02U);
+            bl_send_response(s_locked_channel, BL_CMD_WRITE, 0x02U);
         }
         break;
 
     case BL_CMD_VERIFY:
-        if (s_length == 2U) {
-            uint16_t expected_crc = ((uint16_t)s_payload[0] << 8U) | s_payload[1];
+        if (parser->length == 2U) {
+            uint16_t expected_crc = ((uint16_t)parser->payload[0] << 8U) | parser->payload[1];
             if (bl_flash_verify_crc(expected_crc)) {
                 bl_flash_mark_complete();
-                bl_send_response(BL_CMD_VERIFY, 0x00U);
+                bl_send_response(s_locked_channel, BL_CMD_VERIFY, 0x00U);
             } else {
-                bl_send_response(BL_CMD_VERIFY, 0x01U);
+                bl_send_response(s_locked_channel, BL_CMD_VERIFY, 0x01U);
             }
         } else {
-            bl_send_response(BL_CMD_VERIFY, 0x02U);
+            bl_send_response(s_locked_channel, BL_CMD_VERIFY, 0x02U);
         }
         break;
 
     default:
-        bl_send_response(s_command, 0xFFU);
+        bl_send_response(s_locked_channel, parser->command, 0xFFU);
         break;
     }
 }
 
 uint32_t bl_uart_received_bytes(void)
 {
-    return s_received_bytes;
+    return s_parsers[0].byte_count + s_parsers[1].byte_count;
+}
+
+bl_channel_t bl_uart_locked_channel(void)
+{
+    return s_locked_channel;
 }

@@ -166,6 +166,34 @@ void board_i2c_oled_write(uint8_t dev_addr, const uint8_t *data, uint16_t length
 }
 
 /* -------------------------------------------------------------------------- */
+/* UART2 - HC-06 Bluetooth                                                    */
+/* -------------------------------------------------------------------------- */
+void board_com_bt_init(void)
+{
+    rcu_periph_clock_enable(BOARD_UART_BT_TX_CLK);
+    rcu_periph_clock_enable(BOARD_UART_BT_RX_CLK);
+    rcu_periph_clock_enable(BOARD_UART_BT_CLK);
+
+    gpio_af_set(BOARD_UART_BT_TX_PORT, BOARD_UART_BT_TX_AF, BOARD_UART_BT_TX_PIN);
+    gpio_mode_set(BOARD_UART_BT_TX_PORT, GPIO_MODE_AF, GPIO_PUPD_PULLUP, BOARD_UART_BT_TX_PIN);
+    gpio_output_options_set(BOARD_UART_BT_TX_PORT, GPIO_OTYPE_PP, GPIO_OSPEED_50MHZ, BOARD_UART_BT_TX_PIN);
+
+    gpio_af_set(BOARD_UART_BT_RX_PORT, BOARD_UART_BT_RX_AF, BOARD_UART_BT_RX_PIN);
+    gpio_mode_set(BOARD_UART_BT_RX_PORT, GPIO_MODE_AF, GPIO_PUPD_PULLUP, BOARD_UART_BT_RX_PIN);
+
+    usart_deinit(BOARD_UART_BT);
+    usart_baudrate_set(BOARD_UART_BT, BOARD_UART_BT_BAUDRATE);
+    usart_word_length_set(BOARD_UART_BT, USART_WL_8BIT);
+    usart_stop_bit_set(BOARD_UART_BT, USART_STB_1BIT);
+    usart_parity_config(BOARD_UART_BT, USART_PM_NONE);
+    usart_hardware_flow_rts_config(BOARD_UART_BT, USART_RTS_DISABLE);
+    usart_hardware_flow_cts_config(BOARD_UART_BT, USART_CTS_DISABLE);
+    usart_receive_config(BOARD_UART_BT, USART_RECEIVE_ENABLE);
+    usart_transmit_config(BOARD_UART_BT, USART_TRANSMIT_ENABLE);
+    usart_enable(BOARD_UART_BT);
+}
+
+/* -------------------------------------------------------------------------- */
 /* SPI for external Flash                                                     */
 /* -------------------------------------------------------------------------- */
 void board_spi_flash_init(void)

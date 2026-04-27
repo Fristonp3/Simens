@@ -47,6 +47,7 @@ void app_main_init(void)
 
     bsp_gpio_init();
     bsp_uart_init();
+    bsp_uart_bt_init();
     bsp_rtc_init();
     bsp_adc_init();
     bsp_power_init();
@@ -82,6 +83,7 @@ void app_main_init(void)
     s_app.display_dirty = false;
 
     bsp_uart_send_string("\r\nIndustrial acquisition firmware ready.\r\n");
+    bsp_uart_bt_send_string("\r\nIndustrial acquisition firmware ready (BT).\r\n");
 }
 
 void app_main_process(void)
@@ -91,7 +93,7 @@ void app_main_process(void)
 
     bsp_gpio_poll(now_ms);
 
-    if(bsp_uart_take_activity_flag()) {
+    if(bsp_uart_take_activity_flag() || bsp_uart_bt_take_activity_flag()) {
         s_app.last_uart_ms = now_ms;
         srv_power_mark_activity(now_ms);
         s_app.status.last_activity_ms = now_ms;
